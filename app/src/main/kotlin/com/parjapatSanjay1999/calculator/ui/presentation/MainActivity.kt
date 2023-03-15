@@ -22,7 +22,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val vm by viewModels<CalculatorViewModel>()
-                    Calculator(state = vm.state, onEvent = vm::onEvent)
+                    Calculator(expression = vm.expression, result = vm.result, onEvent = vm::onEvent)
                 }
             }
         }

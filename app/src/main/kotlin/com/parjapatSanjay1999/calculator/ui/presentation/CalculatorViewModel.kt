@@ -1,93 +1,173 @@
 package com.parjapatSanjay1999.calculator.ui.presentation
 
+import android.util.Log
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.parjapatSanjay1999.calculator.ui.presentation.components.CalculatorEvent
 import com.parjapatSanjay1999.calculator.ui.presentation.components.CalculatorOperation
-import com.parjapatSanjay1999.calculator.ui.presentation.components.CalculatorState
+import java.math.BigDecimal
+import java.util.*
 
 private const val TAG = "CalculatorViewModel"
 
 class CalculatorViewModel : ViewModel() {
 
-    var state by mutableStateOf(CalculatorState())
+    var result by mutableStateOf<BigDecimal?>(null)
         private set
+    private val _expression = mutableStateListOf<String>()
+    val expression = _expression
+
+    private var _selectedIndex by mutableStateOf<Int?>(null)
+    val isSelectedMode = _selectedIndex
 
     fun onEvent(event: CalculatorEvent) {
         when (event) {
             CalculatorEvent.Calculate -> {
-                if (state.operation == null) return
-                val num1 = state.num1!!.toFloat()
-                val num2 = state.num2!!.toFloat()
-                val calculatedResult = calculate(num1, num2, state.operation!!)
-                state =
-                    state.copy(result = "= " + calculate(num1, num2, state.operation!!).toString())
-                saveState(state)
+                if (_expression.isNotEmpty())
+                    result = calculate(_expression)
             }
             is CalculatorEvent.CalculatorNum -> {
-                if(state.result!=null)
-                    state = state.copy(num1 = null, num2 = null, operation = null, result = null)
-                state = if (state.operation == null) {
-                    state.copy(num1 = if (state.num1 != null) state.num1 + event.num else event.num.toString())
-                } else {
-                    state.copy(num2 = if (state.num2 != null) state.num2 + event.num else event.num.toString())
+                when {
+                    _expression.isEmpty() -> {
+                        _expression.add(event.num.toString())
+                    }
+                    isOperator(_expression.last()) -> {
+                        _expression.add(event.num.toString())
+                    }
+                    else -> {
+                        val last = _expression.removeLast()
+                        _expression.add(last + event.num)
+                    }
                 }
             }
             CalculatorEvent.Clear -> {
-                state = state.copy(num1 = null, num2 = null, operation = null, result = null)
+                _expression.clear()
+                result = null
             }
             CalculatorEvent.Decimal -> {
-                state = if (state.operation == null) {
-                    if (state.num1 != null && !state.num1!!.contains(".")) state.copy(num1 = state.num1 + ".")
-                    else state
-                } else {
-                    if (state.num2 != null && !state.num2!!.contains(".")) state.copy(num2 = state.num2 + ".")
-                    else state
+                when {
+                    _expression.isEmpty() || isOperator(_expression.last()) -> return
+                    result != null -> {
+                        _expression.clear()
+                        _expression.add(
+                            if (!result.toString().contains("."))
+                                "${result}."
+                            else
+                                result.toString()
+                        )
+                        result = null
+                    }
+                    !_expression.last().contains(".") -> {
+                        val last = _expression.removeLast()
+                        _expression.add("$last.")
+                    }
                 }
             }
             CalculatorEvent.Delete -> {
-                state = if (state.operation == null) {
-                    state.copy(num1 = state.num1?.dropLast(1))
-                } else {
-                    state.copy(num2 = state.num2?.dropLast(1))
+                when {
+                    _expression.isEmpty() -> return
+                    isOperator(_expression.last()) -> _expression.removeLast()
+                    else -> {
+                        val last = _expression.removeLast()
+                        _expression.add(last.dropLast(1))
+                    }
                 }
             }
             is CalculatorEvent.Operation -> {
-                if (state.operation == null) {
-                    state = state.copy(operation = event.operation)
-                    return
+                when {
+                    _expression.isEmpty() -> {
+                        // Case for first negative number
+                        _expression.add("-1")
+                        _expression.add(CalculatorOperation.Multiply.symbol)
+                    }
+                    isOperator(_expression.last()) -> {
+                        _expression.removeLast()
+                        _expression.add(event.operation.symbol)
+                    }
+                    result != null -> {
+                        _expression.clear()
+                        _expression.add(result.toString())
+                        _expression.add(event.operation.symbol)
+                        result = null
+                    }
+                    else -> {
+                        _expression.add(event.operation.symbol)
+                    }
                 }
-                val num1 = state.num1!!.toFloat()
-                val num2 = state.num2!!.toFloat()
-                val calculatedResult = calculate(num1, num2, state.operation!!)
-                state = state.copy(
-                    num1 = calculatedResult.toString(),
-                    num2 = null,
-                    operation = event.operation,
-                    result = null
-                )
             }
             CalculatorEvent.Percentage -> {
-                state = if (state.operation == null)
-                    state.copy(num1 = ((state.num1?.toFloat() ?: return) / 100).toString())
-                else
-                    state.copy(num2 = ((state.num2?.toFloat() ?: return) / 100).toString())
+                if (_expression.isEmpty() || isOperator(_expression.last()))
+                    return
+                val last = _expression.removeLast()
+                val new = BigDecimal(last).divide(BigDecimal(100))
+                _expression.add(new.toString())
             }
         }
     }
 
-    private fun calculate(num1: Float, num2: Float, operation: CalculatorOperation): Float {
-        return when (operation) {
-            CalculatorOperation.Add -> num1 + num2
-            CalculatorOperation.Divide -> num1 / num2
-            CalculatorOperation.Multiply -> num1 * num2
-            CalculatorOperation.Subtract -> num1 - num2
+    private fun isOperator(char: String): Boolean {
+        return CalculatorOperation.values().map { it.symbol }.contains(char)
+    }
+
+    private fun precedence(operator: String): Int {
+        return when (operator) {
+            CalculatorOperation.Add.symbol, CalculatorOperation.Subtract.symbol -> 1
+            CalculatorOperation.Multiply.symbol, CalculatorOperation.Divide.symbol -> 2
+            else -> -1
         }
     }
 
-    private fun saveState(state: CalculatorState) {
+    private fun infixToPostfix(exp: MutableList<String>): MutableList<String> {
+        val result: MutableList<String> = mutableListOf()
+        val stack = Stack<String>()
+        for (element in exp) {
+            if (!isOperator(element))
+                result.add(element)
+            else {
+                while (!stack.isEmpty() && precedence(element) <= precedence(stack.peek())) {
+                    result += stack.peek()
+                    stack.pop()
+                }
+                stack.push(element)
+            }
+        }
+        while (!stack.isEmpty()) {
+            result += stack.peek()
+            stack.pop()
+        }
+        return result
+    }
 
+    private fun evaluatePostfix(exp: MutableList<String>): BigDecimal {
+        val stack = Stack<BigDecimal>()
+        for (element in exp) {
+            if (!isOperator(element))
+                stack.push(BigDecimal(element))
+            else {
+                val val1 = stack.pop()
+                val val2 = stack.pop()
+                when (element) {
+                    CalculatorOperation.Add.symbol -> stack.push(val2 + val1)
+                    CalculatorOperation.Subtract.symbol -> stack.push(val2 - val1)
+                    CalculatorOperation.Divide.symbol -> stack.push(val2 / val1)
+                    CalculatorOperation.Multiply.symbol -> stack.push(val2 * val1)
+                }
+            }
+        }
+        return stack.pop()
+    }
+
+    private fun calculate(statement: List<String>): BigDecimal? {
+        return try {
+             val postfix = infixToPostfix(statement.toMutableList())
+              evaluatePostfix(postfix)
+        }
+        catch (e: java.lang.Exception) {
+            e.printStackTrace()
+            null
+        }
     }
 }

@@ -10,14 +10,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.parjapatSanjay1999.calculator.R.drawable
 import com.parjapatSanjay1999.calculator.ui.theme.Orange
+import java.math.BigDecimal
+
+private const val TAG = "Calculator"
 
 @Composable
-fun Calculator(state: CalculatorState, onEvent: (CalculatorEvent) -> Unit) {
+fun Calculator(expression: List<String>, result: BigDecimal?, onEvent: (CalculatorEvent) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -30,12 +32,7 @@ fun Calculator(state: CalculatorState, onEvent: (CalculatorEvent) -> Unit) {
                 .weight(1f),
             verticalArrangement = Arrangement.Bottom
         ) {
-            var text = ""
-            if (state.num1 != null) {
-                text += state.num1
-                if (state.operation != null) text += state.operation.symbol
-                if (state.num2 != null) text += state.num2
-            }
+            val text = expression.joinToString(separator = "")
             Text(
                 text = text,
                 color = Color.Black,
@@ -44,10 +41,10 @@ fun Calculator(state: CalculatorState, onEvent: (CalculatorEvent) -> Unit) {
                 textAlign = TextAlign.End,
                 modifier = Modifier.fillMaxWidth()
             )
-            state.result?.let { res->
+            result?.let { res ->
                 Spacer(modifier = Modifier.height(5.dp))
                 Text(
-                    text = res,
+                    text = "= $res",
                     color = Color.Black,
                     fontSize = 35.sp,
                     fontWeight = FontWeight.Bold,
@@ -265,13 +262,5 @@ private fun CalculatorButtons(modifier: Modifier = Modifier, onEvent: (Calculato
                 onEvent(CalculatorEvent.Calculate)
             }
         }
-    }
-}
-
-@Preview
-@Composable
-fun CalculatorPreview() {
-    Calculator(CalculatorState(num1 = "8")) {
-
     }
 }
