@@ -11,4 +11,6 @@ sealed class CalculatorEvent {
     object ChangeSign:CalculatorEvent()
     data class CalculatorNum(val num :Int) : CalculatorEvent()
     data class Operation(val operation: CalculatorOperation) : CalculatorEvent()
+    object ToggleButtons:CalculatorEvent()
+    object ClearHistory:CalculatorEvent()
 }

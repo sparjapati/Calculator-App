@@ -5,29 +5,45 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.parjapatSanjay1999.calculator.data.CalculationEntity
+import com.parjapatSanjay1999.calculator.data.CalculatorDao
 import com.parjapatSanjay1999.calculator.ui.presentation.components.CalculatorEvent
 import com.parjapatSanjay1999.calculator.ui.presentation.components.CalculatorOperation
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.util.*
+import javax.inject.Inject
 
 private const val TAG = "CalculatorViewModel"
 
-class CalculatorViewModel : ViewModel() {
+@HiltViewModel
+class CalculatorViewModel @Inject constructor(
+    private val db: CalculatorDao
+) : ViewModel() {
 
     var result by mutableStateOf<BigDecimal?>(null)
         private set
     private val _expression = mutableStateListOf<String>()
     val expression = _expression
 
-    private val _isHistoryVisible by mutableStateOf(false)
-    val isHistoryVisible = _isHistoryVisible
+    var isButtonsVisible by mutableStateOf(true)
+        private set
+
+    val prevCalculations = db.getAllCalculations()
 
     fun onEvent(event: CalculatorEvent) {
         when (event) {
             CalculatorEvent.Calculate -> {
                 if (_expression.isNotEmpty())
-                    result = calculate(_expression)
+                    result = calculate(_expression)?.also { res ->
+                        viewModelScope.launch(Dispatchers.IO) {
+                            db.insertCalculation(CalculationEntity(expr = expression, res = res))
+                        }
+                    }
             }
             is CalculatorEvent.CalculatorNum -> {
                 when {
@@ -35,6 +51,11 @@ class CalculatorViewModel : ViewModel() {
                         _expression.add(event.num.toString())
                     }
                     isOperator(_expression.last()) -> {
+                        _expression.add(event.num.toString())
+                    }
+                    result != null -> {
+                        _expression.clear()
+                        result = null
                         _expression.add(event.num.toString())
                     }
                     else -> {
@@ -82,18 +103,30 @@ class CalculatorViewModel : ViewModel() {
                 when {
                     _expression.isEmpty() -> {
                         // Case for first negative number
-                        _expression.add("-1")
-                        _expression.add(CalculatorOperation.Multiply.symbol)
+                        if (event.operation == CalculatorOperation.Subtract) {
+                            _expression.add("-1")
+                            _expression.add(CalculatorOperation.Multiply.symbol)
+                        }
                     }
                     isOperator(_expression.last()) -> {
                         _expression.removeLast()
                         _expression.add(event.operation.symbol)
                     }
                     result != null -> {
-                        _expression.clear()
-                        _expression.add(result.toString())
-                        _expression.add(event.operation.symbol)
-                        result = null
+                        result?.let { res ->
+                            viewModelScope.launch(Dispatchers.IO) {
+                                db.insertCalculation(
+                                    CalculationEntity(
+                                        expr = expression,
+                                        res = res
+                                    )
+                                )
+                                _expression.clear()
+                                _expression.add(result.toString())
+                                _expression.add(event.operation.symbol)
+                                result = null
+                            }
+                        }
                     }
                     else -> {
                         _expression.add(event.operation.symbol)
@@ -120,6 +153,12 @@ class CalculatorViewModel : ViewModel() {
                         _expression.add(last.multiply(BigDecimal(-1)).toString())
                     }
                 }
+            }
+            CalculatorEvent.ToggleButtons -> {
+                isButtonsVisible = !isButtonsVisible
+            }
+            CalculatorEvent.ClearHistory -> {
+                viewModelScope.launch(Dispatchers.IO) { db.clearAllCalculations() }
             }
         }
     }
@@ -168,7 +207,13 @@ class CalculatorViewModel : ViewModel() {
                 when (element) {
                     CalculatorOperation.Add.symbol -> stack.push(val2.add(val1))
                     CalculatorOperation.Subtract.symbol -> stack.push(val2.subtract(val1))
-                    CalculatorOperation.Divide.symbol -> stack.push(val2.divide(val1,4,RoundingMode.CEILING))
+                    CalculatorOperation.Divide.symbol -> stack.push(
+                        val2.divide(
+                            val1,
+                            4,
+                            RoundingMode.CEILING
+                        )
+                    )
                     CalculatorOperation.Multiply.symbol -> stack.push(val2.multiply(val1))
                 }
             }
@@ -184,9 +229,5 @@ class CalculatorViewModel : ViewModel() {
             e.printStackTrace()
             null
         }
-    }
-
-    fun toggleHistory() {
-
     }
 }
