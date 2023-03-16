@@ -8,6 +8,7 @@ sealed class CalculatorEvent {
     object Decimal: CalculatorEvent()
     object Percentage: CalculatorEvent()
     object Calculate : CalculatorEvent()
+    object ChangeSign:CalculatorEvent()
     data class CalculatorNum(val num :Int) : CalculatorEvent()
     data class Operation(val operation: CalculatorOperation) : CalculatorEvent()
 }

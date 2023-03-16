@@ -1,6 +1,5 @@
 package com.parjapatSanjay1999.calculator.ui.presentation
 
-import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -9,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import com.parjapatSanjay1999.calculator.ui.presentation.components.CalculatorEvent
 import com.parjapatSanjay1999.calculator.ui.presentation.components.CalculatorOperation
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.util.*
 
 private const val TAG = "CalculatorViewModel"
@@ -20,8 +20,8 @@ class CalculatorViewModel : ViewModel() {
     private val _expression = mutableStateListOf<String>()
     val expression = _expression
 
-    private var _selectedIndex by mutableStateOf<Int?>(null)
-    val isSelectedMode = _selectedIndex
+    private val _isHistoryVisible by mutableStateOf(false)
+    val isHistoryVisible = _isHistoryVisible
 
     fun onEvent(event: CalculatorEvent) {
         when (event) {
@@ -72,7 +72,9 @@ class CalculatorViewModel : ViewModel() {
                     isOperator(_expression.last()) -> _expression.removeLast()
                     else -> {
                         val last = _expression.removeLast()
-                        _expression.add(last.dropLast(1))
+                        val new = last.dropLast(1)
+                        if (new.isNotBlank())
+                            _expression.add(new)
                     }
                 }
             }
@@ -104,6 +106,20 @@ class CalculatorViewModel : ViewModel() {
                 val last = _expression.removeLast()
                 val new = BigDecimal(last).divide(BigDecimal(100))
                 _expression.add(new.toString())
+            }
+            CalculatorEvent.ChangeSign -> {
+                when {
+                    expression.isEmpty() || isOperator(expression.last()) -> return
+                    result != null -> {
+                        _expression.clear()
+                        _expression.add(result!!.multiply(BigDecimal(-1)).toString())
+                        result = null
+                    }
+                    else -> {
+                        val last = BigDecimal(expression.removeLast())
+                        _expression.add(last.multiply(BigDecimal(-1)).toString())
+                    }
+                }
             }
         }
     }
@@ -150,10 +166,10 @@ class CalculatorViewModel : ViewModel() {
                 val val1 = stack.pop()
                 val val2 = stack.pop()
                 when (element) {
-                    CalculatorOperation.Add.symbol -> stack.push(val2 + val1)
-                    CalculatorOperation.Subtract.symbol -> stack.push(val2 - val1)
-                    CalculatorOperation.Divide.symbol -> stack.push(val2 / val1)
-                    CalculatorOperation.Multiply.symbol -> stack.push(val2 * val1)
+                    CalculatorOperation.Add.symbol -> stack.push(val2.add(val1))
+                    CalculatorOperation.Subtract.symbol -> stack.push(val2.subtract(val1))
+                    CalculatorOperation.Divide.symbol -> stack.push(val2.divide(val1,4,RoundingMode.CEILING))
+                    CalculatorOperation.Multiply.symbol -> stack.push(val2.multiply(val1))
                 }
             }
         }
@@ -162,12 +178,15 @@ class CalculatorViewModel : ViewModel() {
 
     private fun calculate(statement: List<String>): BigDecimal? {
         return try {
-             val postfix = infixToPostfix(statement.toMutableList())
-              evaluatePostfix(postfix)
-        }
-        catch (e: java.lang.Exception) {
+            val postfix = infixToPostfix(statement.toMutableList())
+            evaluatePostfix(postfix)
+        } catch (e: java.lang.Exception) {
             e.printStackTrace()
             null
         }
+    }
+
+    fun toggleHistory() {
+
     }
 }
