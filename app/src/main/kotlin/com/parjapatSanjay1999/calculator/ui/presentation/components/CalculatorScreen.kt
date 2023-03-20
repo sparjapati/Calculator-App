@@ -1,127 +1,179 @@
 package com.parjapatSanjay1999.calculator.ui.presentation.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.parjapatSanjay1999.calculator.data.CalculationEntity
-import com.parjapatSanjay1999.calculator.ui.theme.Black
-import com.parjapatSanjay1999.calculator.ui.theme.Grey
-import com.parjapatSanjay1999.calculator.ui.theme.Orange
 import java.math.BigDecimal
 
 private const val TAG = "Calculator"
 
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
-fun Calculator(
+fun CalculatorScreen(
     modifier: Modifier = Modifier,
     calculationHistory: List<CalculationEntity>,
+    isShowingHistory: Boolean,
     expression: List<String>,
     result: BigDecimal?,
-    isButtonsVisible: Boolean,
     onEvent: (CalculatorEvent) -> Unit,
 ) {
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(10.dp),
-        verticalArrangement = Arrangement.spacedBy(5.dp)
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 5.dp)
     ) {
-        val listState = rememberLazyListState()
-        LazyColumn(
+        val angle by animateFloatAsState(
+            targetValue = if (isShowingHistory) -45f else 0f
+        )
+        val primaryColor = MaterialTheme.colorScheme.primary
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.Bottom),
-            state = listState
+                .fillMaxSize()
+                .padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
-            val historyItemTextColors = Grey
-            items(calculationHistory) {
-                Text(
-                    text = it.expr.joinToString(""),
-                    color = historyItemTextColors,
-                    fontSize = 25.sp,
-                    fontWeight = FontWeight.Medium,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Text(
-                    text = "= ${it.res}",
-                    color = historyItemTextColors,
-                    fontSize = 25.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-            val textColor = Black
-            item {
-                Column(
-                    modifier = Modifier
-                        .border(
-                            width = 2.dp,
-                            color = Orange,
-                            shape = RoundedCornerShape(5.dp)
-                        )
-                        .padding(5.dp)
-                ) {
-                    val text = expression.joinToString(separator = "")
+            val listState = rememberLazyListState()
+            val textColor = MaterialTheme.colorScheme.onBackground
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.Bottom),
+                state = listState
+            ) {
+                items(calculationHistory) {
                     Text(
-                        text = text,
+                        text = it.expr.joinToString(""),
                         color = textColor,
-                        fontSize = 25.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Medium,
                         textAlign = TextAlign.End,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    result?.let { res ->
-                        Spacer(modifier = Modifier.height(5.dp))
-                        Text(
-                            text = "= $res",
-                            color = textColor,
-                            fontSize = 35.sp,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.End,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                    Text(
+                        text = "= ${it.res}",
+                        color = textColor,
+                        fontSize = 25.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                if (!isShowingHistory) {
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .border(
+                                    width = 2.dp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    shape = RoundedCornerShape(5.dp)
+                                )
+                                .padding(5.dp)
+                        ) {
+                            val text = expression.joinToString(separator = "")
+                            Text(
+                                text = text,
+                                color = textColor,
+                                fontSize = 25.sp,
+                                fontWeight = FontWeight.Medium,
+                                textAlign = TextAlign.End,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            result?.let { res ->
+                                Spacer(modifier = Modifier.height(5.dp))
+                                Text(
+                                    text = "= $res",
+                                    color = textColor,
+                                    fontSize = 35.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.End,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
                     }
                 }
             }
+            LaunchedEffect(key1 = calculationHistory, key2 = isShowingHistory) {
+                if (calculationHistory.isNotEmpty()) listState.scrollToItem(calculationHistory.lastIndex)
+            }
+            AnimatedVisibility(visible = !isShowingHistory) {
+                CalculatorButtons(
+                    modifier = Modifier.animateEnterExit(
+                        enter = slideInVertically(), exit = slideOutVertically()
+                    ), onEvent = onEvent
+                )
+            }
         }
-        LaunchedEffect(key1 = calculationHistory, key2 = isButtonsVisible) {
-            if (calculationHistory.isNotEmpty())
-                listState.scrollToItem(calculationHistory.lastIndex)
+        AnimatedVisibility(
+            visible = isShowingHistory,
+            modifier = Modifier
+                .clickable {
+                    onEvent(CalculatorEvent.ClearHistory)
+                }
+                .padding(bottom = 10.dp)
+                .align(Alignment.BottomCenter),
+            enter = slideInVertically(),
+            exit = slideOutVertically()) {
+            Icon(
+                imageVector = Icons.Outlined.ClearAll,
+                contentDescription = "Clear history",
+                tint = primaryColor,
+            )
         }
-        AnimatedVisibility(visible = isButtonsVisible) {
-            CalculatorButtons(onEvent = onEvent)
-        }
+        Icon(imageVector = Icons.Outlined.Update,
+            contentDescription = "Show history",
+            tint = primaryColor,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .rotate(angle)
+                .clickable {
+                    onEvent(CalculatorEvent.ToggleShowHistory)
+                }
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(5.dp)
+        )
     }
 }
 
 @Composable
 private fun CalculatorButtons(modifier: Modifier = Modifier, onEvent: (CalculatorEvent) -> Unit) {
-    val operationColor = Orange
-    val numberTextColor = Black
-    val aspectRatio = 1.3f
+    val operationColor = MaterialTheme.colorScheme.primary
+    val numberTextColor = MaterialTheme.colorScheme.onBackground
+    val buttonsAspectRatio = 1.3f
     Column(
         modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {
@@ -135,7 +187,7 @@ private fun CalculatorButtons(modifier: Modifier = Modifier, onEvent: (Calculato
                 textColor = operationColor,
                 modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(aspectRatio)
+                    .aspectRatio(buttonsAspectRatio)
             ) {
                 onEvent(CalculatorEvent.Clear)
             }
@@ -144,7 +196,7 @@ private fun CalculatorButtons(modifier: Modifier = Modifier, onEvent: (Calculato
                 tintColor = operationColor,
                 modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(aspectRatio)
+                    .aspectRatio(buttonsAspectRatio)
             ) {
                 onEvent(CalculatorEvent.Delete)
             }
@@ -153,7 +205,7 @@ private fun CalculatorButtons(modifier: Modifier = Modifier, onEvent: (Calculato
                 tintColor = operationColor,
                 modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(aspectRatio)
+                    .aspectRatio(buttonsAspectRatio)
             ) {
                 onEvent(CalculatorEvent.Percentage)
             }
@@ -162,7 +214,7 @@ private fun CalculatorButtons(modifier: Modifier = Modifier, onEvent: (Calculato
                 textColor = operationColor,
                 modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(aspectRatio)
+                    .aspectRatio(buttonsAspectRatio)
             ) {
                 onEvent(CalculatorEvent.Operation(CalculatorOperation.Divide))
             }
@@ -173,23 +225,29 @@ private fun CalculatorButtons(modifier: Modifier = Modifier, onEvent: (Calculato
             verticalAlignment = Alignment.CenterVertically
         ) {
             CalculatorButton(
-                symbol = "7", textColor = numberTextColor, modifier = Modifier
+                symbol = "7",
+                textColor = numberTextColor,
+                modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(aspectRatio)
+                    .aspectRatio(buttonsAspectRatio)
             ) {
                 onEvent(CalculatorEvent.CalculatorNum(7))
             }
             CalculatorButton(
-                symbol = "8", textColor = numberTextColor, modifier = Modifier
+                symbol = "8",
+                textColor = numberTextColor,
+                modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(aspectRatio)
+                    .aspectRatio(buttonsAspectRatio)
             ) {
                 onEvent(CalculatorEvent.CalculatorNum(8))
             }
             CalculatorButton(
-                symbol = "9", textColor = numberTextColor, modifier = Modifier
+                symbol = "9",
+                textColor = numberTextColor,
+                modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(aspectRatio)
+                    .aspectRatio(buttonsAspectRatio)
             ) {
                 onEvent(CalculatorEvent.CalculatorNum(9))
             }
@@ -198,7 +256,7 @@ private fun CalculatorButtons(modifier: Modifier = Modifier, onEvent: (Calculato
                 tintColor = operationColor,
                 modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(aspectRatio)
+                    .aspectRatio(buttonsAspectRatio)
             ) {
                 onEvent(CalculatorEvent.Operation(CalculatorOperation.Multiply))
             }
@@ -209,23 +267,29 @@ private fun CalculatorButtons(modifier: Modifier = Modifier, onEvent: (Calculato
             verticalAlignment = Alignment.CenterVertically
         ) {
             CalculatorButton(
-                symbol = "4", textColor = numberTextColor, modifier = Modifier
+                symbol = "4",
+                textColor = numberTextColor,
+                modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(aspectRatio)
+                    .aspectRatio(buttonsAspectRatio)
             ) {
                 onEvent(CalculatorEvent.CalculatorNum(4))
             }
             CalculatorButton(
-                symbol = "5", textColor = numberTextColor, modifier = Modifier
+                symbol = "5",
+                textColor = numberTextColor,
+                modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(aspectRatio)
+                    .aspectRatio(buttonsAspectRatio)
             ) {
                 onEvent(CalculatorEvent.CalculatorNum(5))
             }
             CalculatorButton(
-                symbol = "6", textColor = numberTextColor, modifier = Modifier
+                symbol = "6",
+                textColor = numberTextColor,
+                modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(aspectRatio)
+                    .aspectRatio(buttonsAspectRatio)
             ) {
                 onEvent(CalculatorEvent.CalculatorNum(6))
             }
@@ -234,7 +298,7 @@ private fun CalculatorButtons(modifier: Modifier = Modifier, onEvent: (Calculato
                 tintColor = operationColor,
                 modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(aspectRatio)
+                    .aspectRatio(buttonsAspectRatio)
             ) {
                 onEvent(CalculatorEvent.Operation(CalculatorOperation.Subtract))
             }
@@ -245,23 +309,29 @@ private fun CalculatorButtons(modifier: Modifier = Modifier, onEvent: (Calculato
             verticalAlignment = Alignment.CenterVertically
         ) {
             CalculatorButton(
-                symbol = "1", textColor = numberTextColor, modifier = Modifier
+                symbol = "1",
+                textColor = numberTextColor,
+                modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(aspectRatio)
+                    .aspectRatio(buttonsAspectRatio)
             ) {
                 onEvent(CalculatorEvent.CalculatorNum(1))
             }
             CalculatorButton(
-                symbol = "2", textColor = numberTextColor, modifier = Modifier
+                symbol = "2",
+                textColor = numberTextColor,
+                modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(aspectRatio)
+                    .aspectRatio(buttonsAspectRatio)
             ) {
                 onEvent(CalculatorEvent.CalculatorNum(2))
             }
             CalculatorButton(
-                symbol = "3", textColor = numberTextColor, modifier = Modifier
+                symbol = "3",
+                textColor = numberTextColor,
+                modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(aspectRatio)
+                    .aspectRatio(buttonsAspectRatio)
             ) {
                 onEvent(CalculatorEvent.CalculatorNum(3))
             }
@@ -270,7 +340,7 @@ private fun CalculatorButtons(modifier: Modifier = Modifier, onEvent: (Calculato
                 tintColor = operationColor,
                 modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(aspectRatio)
+                    .aspectRatio(buttonsAspectRatio)
             ) {
                 onEvent(CalculatorEvent.Operation(CalculatorOperation.Add))
             }
@@ -294,7 +364,7 @@ private fun CalculatorButtons(modifier: Modifier = Modifier, onEvent: (Calculato
                 tintColor = operationColor,
                 modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(aspectRatio)
+                    .aspectRatio(buttonsAspectRatio)
                     .padding(17.dp)
             ) {
                 onEvent(CalculatorEvent.Decimal)
@@ -305,7 +375,7 @@ private fun CalculatorButtons(modifier: Modifier = Modifier, onEvent: (Calculato
                 textColor = operationColor,
                 modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(aspectRatio)
+                    .aspectRatio(buttonsAspectRatio)
             ) {
                 onEvent(CalculatorEvent.ChangeSign)
             }
@@ -314,7 +384,7 @@ private fun CalculatorButtons(modifier: Modifier = Modifier, onEvent: (Calculato
                 tintColor = operationColor,
                 modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(aspectRatio)
+                    .aspectRatio(buttonsAspectRatio)
             ) {
                 onEvent(CalculatorEvent.Calculate)
             }

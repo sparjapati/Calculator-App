@@ -4,10 +4,9 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import java.math.BigDecimal
 
-@Entity(tableName = "calculations")
+@Entity(tableName = "calculations", primaryKeys = ["expr","res"])
 data class CalculationEntity(
-    @PrimaryKey
-    val time: Long = System.currentTimeMillis(),
     val expr: List<String>,
-    val res: BigDecimal
+    val res: BigDecimal,
+    val time:Long = System.currentTimeMillis()
 )

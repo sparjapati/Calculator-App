@@ -30,7 +30,7 @@ class CalculatorViewModel @Inject constructor(
     private val _expression = mutableStateListOf<String>()
     val expression = _expression
 
-    var isButtonsVisible by mutableStateOf(true)
+    var isShowingHistory by mutableStateOf(false)
         private set
 
     val prevCalculations = db.getAllCalculations()
@@ -154,11 +154,14 @@ class CalculatorViewModel @Inject constructor(
                     }
                 }
             }
-            CalculatorEvent.ToggleButtons -> {
-                isButtonsVisible = !isButtonsVisible
+            CalculatorEvent.ToggleShowHistory -> {
+                isShowingHistory = !isShowingHistory
             }
             CalculatorEvent.ClearHistory -> {
-                viewModelScope.launch(Dispatchers.IO) { db.clearAllCalculations() }
+                viewModelScope.launch(Dispatchers.IO) {
+                    db.clearAllCalculations()
+                    onEvent(CalculatorEvent.ToggleShowHistory)
+                }
             }
         }
     }
