@@ -10,7 +10,6 @@ import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import com.parjapatSanjay1999.calculator.ui.presentation.components.CalculatorScreen
 import com.parjapatSanjay1999.calculator.ui.theme.CalculatorTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -24,12 +23,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             CalculatorTheme {
                 val vm by viewModels<CalculatorViewModel>()
-                val calculationHistory by vm.prevCalculations.collectAsState(initial = emptyList())
                 CalculatorScreen(
-                    calculationHistory = calculationHistory,
-                    isShowingHistory = vm.isShowingHistory,
-                    expression = vm.expression,
-                    result = vm.result,
+                    state = vm.state.collectAsState(CalculatorState()).value,
                     onEvent = vm::onEvent
                 )
             }

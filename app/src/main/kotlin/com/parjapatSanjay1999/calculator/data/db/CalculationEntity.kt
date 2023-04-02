@@ -1,7 +1,6 @@
-package com.parjapatSanjay1999.calculator.data
+package com.parjapatSanjay1999.calculator.data.db
 
 import androidx.room.Entity
-import androidx.room.PrimaryKey
 import java.math.BigDecimal
 
 @Entity(tableName = "calculations", primaryKeys = ["expr","res"])

@@ -1,4 +1,4 @@
-package com.parjapatSanjay1999.calculator.data
+package com.parjapatSanjay1999.calculator.data.db
 
 import androidx.room.Database
 import androidx.room.RoomDatabase

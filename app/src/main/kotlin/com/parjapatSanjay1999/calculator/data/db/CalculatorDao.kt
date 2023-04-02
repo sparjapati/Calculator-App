@@ -1,4 +1,4 @@
-package com.parjapatSanjay1999.calculator.data
+package com.parjapatSanjay1999.calculator.data.db
 
 import androidx.room.Dao
 import androidx.room.Insert
@@ -14,6 +14,6 @@ interface CalculatorDao {
     @Query("DELETE FROM calculations")
     suspend fun clearAllCalculations()
 
-    @Query("SELECT * FROM calculations ORDER BY time ASC")
+    @Query("SELECT * FROM calculations ORDER BY time DESC")
     fun getAllCalculations(): Flow<List<CalculationEntity>>
 }

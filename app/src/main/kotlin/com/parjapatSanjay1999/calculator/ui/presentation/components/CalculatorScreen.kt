@@ -22,19 +22,20 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.parjapatSanjay1999.calculator.data.CalculationEntity
-import java.math.BigDecimal
+import com.parjapatSanjay1999.calculator.ui.presentation.CalculatorState
 
 private const val TAG = "Calculator"
 
@@ -42,10 +43,7 @@ private const val TAG = "Calculator"
 @Composable
 fun CalculatorScreen(
     modifier: Modifier = Modifier,
-    calculationHistory: List<CalculationEntity>,
-    isShowingHistory: Boolean,
-    expression: List<String>,
-    result: BigDecimal?,
+    state: CalculatorState,
     onEvent: (CalculatorEvent) -> Unit,
 ) {
     Box(
@@ -55,7 +53,7 @@ fun CalculatorScreen(
             .padding(horizontal = 5.dp)
     ) {
         val angle by animateFloatAsState(
-            targetValue = if (isShowingHistory) -45f else 0f
+            targetValue = if (state.isShowingHistory) -45f else 0f
         )
         val primaryColor = MaterialTheme.colorScheme.primary
         Column(
@@ -71,27 +69,10 @@ fun CalculatorScreen(
                     .fillMaxWidth()
                     .weight(1f),
                 verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.Bottom),
-                state = listState
+                state = listState,
+                reverseLayout = true
             ) {
-                items(calculationHistory) {
-                    Text(
-                        text = it.expr.joinToString(""),
-                        color = textColor,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.End,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Text(
-                        text = "= ${it.res}",
-                        color = textColor,
-                        fontSize = 25.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.End,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                if (!isShowingHistory) {
+                if (!state.isShowingHistory) {
                     item {
                         Column(
                             modifier = Modifier
@@ -102,16 +83,15 @@ fun CalculatorScreen(
                                 )
                                 .padding(5.dp)
                         ) {
-                            val text = expression.joinToString(separator = "")
+                            val text = getAnnotatedString(state.expression)
                             Text(
                                 text = text,
-                                color = textColor,
                                 fontSize = 25.sp,
                                 fontWeight = FontWeight.Medium,
                                 textAlign = TextAlign.End,
                                 modifier = Modifier.fillMaxWidth()
                             )
-                            result?.let { res ->
+                            state.result?.let { res ->
                                 Spacer(modifier = Modifier.height(5.dp))
                                 Text(
                                     text = "= $res",
@@ -125,11 +105,25 @@ fun CalculatorScreen(
                         }
                     }
                 }
+                items(state.history) {
+                    Text(
+                        text = "= ${it.res}",
+                        color = textColor,
+                        fontSize = 25.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(
+                        text = getAnnotatedString(expression = it.expr),
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
-            LaunchedEffect(key1 = calculationHistory, key2 = isShowingHistory) {
-                if (calculationHistory.isNotEmpty()) listState.scrollToItem(calculationHistory.lastIndex)
-            }
-            AnimatedVisibility(visible = !isShowingHistory) {
+            AnimatedVisibility(visible = !state.isShowingHistory) {
                 CalculatorButtons(
                     modifier = Modifier.animateEnterExit(
                         enter = slideInVertically(), exit = slideOutVertically()
@@ -137,8 +131,7 @@ fun CalculatorScreen(
                 )
             }
         }
-        AnimatedVisibility(
-            visible = isShowingHistory,
+        AnimatedVisibility(visible = state.isShowingHistory,
             modifier = Modifier
                 .clickable {
                     onEvent(CalculatorEvent.ClearHistory)
@@ -164,8 +157,18 @@ fun CalculatorScreen(
                 }
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surface)
-                .padding(5.dp)
-        )
+                .padding(5.dp))
+    }
+}
+
+@Composable
+fun getAnnotatedString(expression: List<String>): AnnotatedString {
+    return buildAnnotatedString {
+        expression.forEach { str ->
+            pushStyle(SpanStyle(color = if (CalculatorOperation.values().map { it.symbol }
+                    .contains(str)) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground))
+            append(str)
+        }
     }
 }
 

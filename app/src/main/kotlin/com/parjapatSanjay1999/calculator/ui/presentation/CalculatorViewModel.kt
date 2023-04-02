@@ -1,17 +1,17 @@
 package com.parjapatSanjay1999.calculator.ui.presentation
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.parjapatSanjay1999.calculator.data.CalculationEntity
-import com.parjapatSanjay1999.calculator.data.CalculatorDao
+import com.parjapatSanjay1999.calculator.data.db.CalculationEntity
+import com.parjapatSanjay1999.calculator.domain.CalculatorRepository
 import com.parjapatSanjay1999.calculator.ui.presentation.components.CalculatorEvent
 import com.parjapatSanjay1999.calculator.ui.presentation.components.CalculatorOperation
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -22,135 +22,142 @@ private const val TAG = "CalculatorViewModel"
 
 @HiltViewModel
 class CalculatorViewModel @Inject constructor(
-    private val db: CalculatorDao
+    private val repository: CalculatorRepository
 ) : ViewModel() {
 
-    var result by mutableStateOf<BigDecimal?>(null)
-        private set
-    private val _expression = mutableStateListOf<String>()
-    val expression = _expression
+    private val _state = MutableStateFlow(CalculatorState())
+    val state = _state.asStateFlow()
 
-    var isShowingHistory by mutableStateOf(false)
-        private set
-
-    val prevCalculations = db.getAllCalculations()
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.getPreviousCalculations().collectLatest {
+                _state.update { state -> state.copy(history = it) }
+            }
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.getUnCalculatedExpressions().collectLatest {
+                _state.update { state -> state.copy(expression = it) }
+            }
+        }
+    }
 
     fun onEvent(event: CalculatorEvent) {
+        val expression = state.value.expression.toMutableList()
+        var result = state.value.result
+        var isShowingHistory = state.value.isShowingHistory
         when (event) {
             CalculatorEvent.Calculate -> {
-                if (_expression.isNotEmpty())
-                    result = calculate(_expression)?.also { res ->
-                        viewModelScope.launch(Dispatchers.IO) {
-                            db.insertCalculation(CalculationEntity(expr = expression, res = res))
+                if (expression.isNotEmpty()) result = calculate(expression)?.also { res ->
+                    viewModelScope.launch(Dispatchers.IO) {
+                        repository.saveCalculation(
+                            CalculationEntity(
+                                expr = expression, res = res
+                            )
+                        )
+                        repository.saveUnCalculatedExpression(emptyList())
+                        result = null
+                        _state.update {
+                            it.copy(
+                                result = result
+                            )
                         }
                     }
+                }
             }
             is CalculatorEvent.CalculatorNum -> {
                 when {
-                    _expression.isEmpty() -> {
-                        _expression.add(event.num.toString())
+                    expression.isEmpty() -> {
+                        expression.add(event.num.toString())
                     }
-                    isOperator(_expression.last()) -> {
-                        _expression.add(event.num.toString())
+                    isOperator(expression.last()) -> {
+                        expression.add(event.num.toString())
                     }
                     result != null -> {
-                        _expression.clear()
+                        expression.clear()
                         result = null
-                        _expression.add(event.num.toString())
+                        expression.add(event.num.toString())
                     }
                     else -> {
-                        val last = _expression.removeLast()
-                        _expression.add(last + event.num)
+                        val last = expression.removeLast()
+                        expression.add(last + event.num)
                     }
                 }
             }
             CalculatorEvent.Clear -> {
-                _expression.clear()
+                expression.clear()
                 result = null
             }
             CalculatorEvent.Decimal -> {
                 when {
-                    _expression.isEmpty() || isOperator(_expression.last()) -> return
+                    expression.isEmpty() || isOperator(expression.last()) -> return
                     result != null -> {
-                        _expression.clear()
-                        _expression.add(
-                            if (!result.toString().contains("."))
-                                "${result}."
-                            else
-                                result.toString()
+                        expression.clear()
+                        expression.add(
+                            if (!result.toString().contains(".")) "${result}."
+                            else result.toString()
                         )
                         result = null
                     }
-                    !_expression.last().contains(".") -> {
-                        val last = _expression.removeLast()
-                        _expression.add("$last.")
+                    !expression.last().contains(".") -> {
+                        val last = expression.removeLast()
+                        expression.add("$last.")
                     }
                 }
             }
             CalculatorEvent.Delete -> {
                 when {
-                    _expression.isEmpty() -> return
-                    isOperator(_expression.last()) -> _expression.removeLast()
+                    expression.isEmpty() -> return
+                    isOperator(expression.last()) -> expression.removeLast()
                     else -> {
-                        val last = _expression.removeLast()
+                        val last = expression.removeLast()
                         val new = last.dropLast(1)
-                        if (new.isNotBlank())
-                            _expression.add(new)
+                        if (new.isNotBlank()) expression.add(new)
                     }
                 }
             }
             is CalculatorEvent.Operation -> {
                 when {
-                    _expression.isEmpty() -> {
-                        // Case for first negative number
+                    expression.isEmpty() -> { // Case for first negative number
                         if (event.operation == CalculatorOperation.Subtract) {
-                            _expression.add("-1")
-                            _expression.add(CalculatorOperation.Multiply.symbol)
+                            expression.add("-1")
+                            expression.add(CalculatorOperation.Multiply.symbol)
                         }
                     }
-                    isOperator(_expression.last()) -> {
-                        _expression.removeLast()
-                        _expression.add(event.operation.symbol)
+                    isOperator(expression.last()) -> {
+                        expression.removeLast()
+                        expression.add(event.operation.symbol)
                     }
                     result != null -> {
-                        result?.let { res ->
-                            viewModelScope.launch(Dispatchers.IO) {
-                                db.insertCalculation(
-                                    CalculationEntity(
-                                        expr = expression,
-                                        res = res
-                                    )
+                        viewModelScope.launch(Dispatchers.IO) {
+                            repository.saveCalculation(
+                                CalculationEntity(
+                                    expr = expression, res = result!!
                                 )
-                                _expression.clear()
-                                _expression.add(result.toString())
-                                _expression.add(event.operation.symbol)
-                                result = null
-                            }
+                            )
                         }
                     }
                     else -> {
-                        _expression.add(event.operation.symbol)
+                        expression.add(event.operation.symbol)
                     }
                 }
             }
             CalculatorEvent.Percentage -> {
-                if (_expression.isEmpty() || isOperator(_expression.last()))
-                    return
-                val last = _expression.removeLast()
+                if (expression.isEmpty() || isOperator(expression.last())) return
+                val last = expression.removeLast()
                 val new = BigDecimal(last).divide(BigDecimal(100))
-                _expression.add(new.toString())
+                expression.add(new.toString())
             }
             CalculatorEvent.ChangeSign -> {
                 when {
                     expression.isEmpty() || isOperator(expression.last()) -> return
                     result != null -> {
-                        _expression.clear()
-                        _expression.add(result!!.multiply(BigDecimal(-1)).toString())
+                        expression.clear()
+                        expression.add(result!!.multiply(BigDecimal(-1)).toString())
                         result = null
                     }
                     else -> {
                         val last = BigDecimal(expression.removeLast())
-                        _expression.add(last.multiply(BigDecimal(-1)).toString())
+                        expression.add(last.multiply(BigDecimal(-1)).toString())
                     }
                 }
             }
@@ -159,10 +166,18 @@ class CalculatorViewModel @Inject constructor(
             }
             CalculatorEvent.ClearHistory -> {
                 viewModelScope.launch(Dispatchers.IO) {
-                    db.clearAllCalculations()
+                    repository.clearCalculationHistory()
                     onEvent(CalculatorEvent.ToggleShowHistory)
                 }
             }
+        }
+        _state.update {
+            it.copy(
+                expression = expression, result = result, isShowingHistory = isShowingHistory
+            )
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.saveUnCalculatedExpression(expression)
         }
     }
 
@@ -182,8 +197,7 @@ class CalculatorViewModel @Inject constructor(
         val result: MutableList<String> = mutableListOf()
         val stack = Stack<String>()
         for (element in exp) {
-            if (!isOperator(element))
-                result.add(element)
+            if (!isOperator(element)) result.add(element)
             else {
                 while (!stack.isEmpty() && precedence(element) <= precedence(stack.peek())) {
                     result += stack.peek()
@@ -202,8 +216,7 @@ class CalculatorViewModel @Inject constructor(
     private fun evaluatePostfix(exp: MutableList<String>): BigDecimal {
         val stack = Stack<BigDecimal>()
         for (element in exp) {
-            if (!isOperator(element))
-                stack.push(BigDecimal(element))
+            if (!isOperator(element)) stack.push(BigDecimal(element))
             else {
                 val val1 = stack.pop()
                 val val2 = stack.pop()
@@ -212,9 +225,7 @@ class CalculatorViewModel @Inject constructor(
                     CalculatorOperation.Subtract.symbol -> stack.push(val2.subtract(val1))
                     CalculatorOperation.Divide.symbol -> stack.push(
                         val2.divide(
-                            val1,
-                            4,
-                            RoundingMode.CEILING
+                            val1, 4, RoundingMode.CEILING
                         )
                     )
                     CalculatorOperation.Multiply.symbol -> stack.push(val2.multiply(val1))
@@ -234,3 +245,10 @@ class CalculatorViewModel @Inject constructor(
         }
     }
 }
+
+data class CalculatorState(
+    val expression: List<String> = emptyList(),
+    val result: BigDecimal? = null,
+    val isShowingHistory: Boolean = false,
+    val history: List<CalculationEntity> = emptyList()
+)
