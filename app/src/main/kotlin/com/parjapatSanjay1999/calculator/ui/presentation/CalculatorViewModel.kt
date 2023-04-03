@@ -1,5 +1,8 @@
 package com.parjapatSanjay1999.calculator.ui.presentation
 
+import android.os.Parcelable
+import android.util.Log
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.parjapatSanjay1999.calculator.data.db.CalculationEntity
@@ -13,6 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.parcelize.Parcelize
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.util.*
@@ -22,23 +26,37 @@ private const val TAG = "CalculatorViewModel"
 
 @HiltViewModel
 class CalculatorViewModel @Inject constructor(
-    private val repository: CalculatorRepository
+    private val savedStateHandle: SavedStateHandle, private val repository: CalculatorRepository
 ) : ViewModel() {
+    companion object {
+        private const val KEY_CALCULATOR_STATE = "CalculatorViewModel.calculatorState"
+    }
 
-    private val _state = MutableStateFlow(CalculatorState())
+    private val _state = MutableStateFlow(
+        value = savedStateHandle[KEY_CALCULATOR_STATE] ?: CalculatorState()
+    )
     val state = _state.asStateFlow()
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
             repository.getPreviousCalculations().collectLatest {
-                _state.update { state -> state.copy(history = it) }
+                updateState(state.value.copy(history = it))
             }
         }
         viewModelScope.launch(Dispatchers.IO) {
             repository.getUnCalculatedExpressions().collectLatest {
-                _state.update { state -> state.copy(expression = it) }
+                updateState(state.value.copy(expression = it))
             }
         }
+    }
+
+    private fun updateState(state: CalculatorState) {
+        _state.update{
+            state
+        }
+        savedStateHandle[KEY_CALCULATOR_STATE] = state
+        val caller = Throwable().stackTrace[1].methodName
+        Log.d(TAG, "$caller saved state = $state")
     }
 
     fun onEvent(event: CalculatorEvent) {
@@ -56,11 +74,7 @@ class CalculatorViewModel @Inject constructor(
                         )
                         repository.saveUnCalculatedExpression(emptyList())
                         result = null
-                        _state.update {
-                            it.copy(
-                                result = result
-                            )
-                        }
+                        updateState(state.value.copy(result = res))
                     }
                 }
             }
@@ -171,11 +185,11 @@ class CalculatorViewModel @Inject constructor(
                 }
             }
         }
-        _state.update {
-            it.copy(
+        updateState(
+            state.value.copy(
                 expression = expression, result = result, isShowingHistory = isShowingHistory
             )
-        }
+        )
         viewModelScope.launch(Dispatchers.IO) {
             repository.saveUnCalculatedExpression(expression)
         }
@@ -246,9 +260,10 @@ class CalculatorViewModel @Inject constructor(
     }
 }
 
+@Parcelize
 data class CalculatorState(
     val expression: List<String> = emptyList(),
     val result: BigDecimal? = null,
     val isShowingHistory: Boolean = false,
     val history: List<CalculationEntity> = emptyList()
-)
+) : Parcelable
